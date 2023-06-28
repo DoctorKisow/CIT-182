@@ -1,0 +1,539 @@
+#!/bin/bash
+#
+# labs - A script used to grade the gpg labs for my CIT-182 Principals of Cybersecurity class.
+# Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+# Dr. Matthew Kisow <mkisow@ccac.edu>
+#
+
+# THE SCRIPT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+# THE AUTHORS OR  COPYRIGHT HOLDERS  BE LIABLE FOR  ANY CLAIM,  DAMAGES OR
+# OTHER LIABILITY,  WHETHER IN AN  ACTION OF CONTRACT,  TORT OR OTHERWISE,
+# ARISING FROM,  OUT OF  OR IN CONNECTION  WITH THE  SCRIPT OR  THE USE OR
+# OTHER DEALINGS IN THE SCRIPT.
+
+# Scroll to the bottom of this script to follow the main script flow.
+
+## Set how the script will behave when certain conditions are encountered.
+# Enable exiting immediately if a command exits with a non-zero status.
+set -e
+
+# Enable erroring on un-bound (undefined) variables.
+#set -u
+
+# Enable filename patterns that match no files to expand to a null string, rather than themselves.
+shopt -s nullglob
+
+# ********************** global variable definitions *********************
+g_PROGNAME="$(basename "${0}")"
+g_VERSION="0.0.12"
+g_PROGRAM_NAME="Validate gpg Labs"
+g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
+g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
+g_AUTHOR_TEXT="Dr. Matthew Kisow"
+g_AUTHOR_EMAIL="mkisow@ccac.edu"
+
+# Script location where it was run from.
+g_SCRIPT_LOCATION="${BASH_SOURCE[@]}"
+
+# (g_<color>_TEXT) - Variables used to control how output is displayed to the screen during script execution.
+g_RED_TEXT="" g_GREEN_TEXT="" g_YELLOW_TEXT="" g_BLUE_TEXT="" g_MAGENTA_TEXT="" g_CYAN_TEXT="" g_WHITE_TEXT="" g_RESET_ATTS=""  g_ALERT_TEXT=""
+if [[ ! -z "${TERM}" && -n "${TERM}" && "${TERM}" != "dumb" ]]; then
+	g_RED_TEXT="$(tput setaf 1)$(tput bold)"
+	g_GREEN_TEXT="$(tput setaf 2)$(tput bold)"
+	g_YELLOW_TEXT="$(tput setaf 3)$(tput bold)"
+	g_BLUE_TEXT="$(tput setaf 4)$(tput bold)"
+	g_MAGENTA_TEXT="$(tput setaf 5)$(tput bold)"
+	g_CYAN_TEXT="$(tput setaf 6)$(tput bold)"
+	g_WHITE_TEXT="$(tput setaf 7)$(tput bold)"
+	g_RESET_ATTS="$(tput sgr0)"
+	g_ALERT_TEXT="$(tput bel)"
+fi
+
+# (g_PREFIXSTRING) - String value used to indicate what is appended to the output at the beginning of screen output during script execution.
+g_PREFIXSTRING="*  "
+
+# You might have to change these.
+g_KEYSERVER_1="hkps://keys.openpgp.org"
+g_KEYSERVER_2="hkps://pgp.mit.edu"
+g_PATHTODESKTOP="/Users/mkisow/Desktop"
+
+# Instructors RSA ID, e-mail address shortname and salutation.
+g_INST_RSAID="007A2EFE19C015A2"
+g_INST_EMAIL="mkisow@ccac.edu"
+g_INST_SHORT=$(echo -e $g_INST_EMAIL | awk '{split($0, email, "@");print email[1]}')
+g_INST_SALUATION="Dr. Kisow"
+
+# Student RSA ID, and e-mail.
+g_STU_EMAIL=""
+g_STU_RSAID=""
+
+# WARNING: DO NOT MODIFY THESE VALUE(S)!
+declare -i g_KEYSERVER_FLAG1=0
+declare -i g_KEYSERVER_FLAG2=0
+
+# (g_ARG_<variable>) - Boolean values used to indicate which command line options are set during execution; the default for all values is 0.
+# WARNING: DO NOT MODIFY THESE VALUE(S)!
+declare -i g_ARG_RECV_KEY=0
+declare -i g_ARG_LAB=0
+declare -i g_ARG_GRADE_LAB=0
+declare -i g_ARG_STU_EMAIL=0
+
+# ####################### begin script basic functions ########################
+# (cleanup_and_exit_with_code) - Function used to properly cleanup the enviornment after an error; the passed value are 1 (error) or 0 (normal).
+function cleanup_and_exit_with_code ()
+{
+	# (l_BOOL) - Boolean value used to indicate a value of 0 or 1.
+	local l_BOOL='^[0-1]+$'
+	if ! [[ $1 =~ $l_BOOL ]]; then
+		error "Function: cleanup_and_exit_with_code was passed a value that is out of bounds."
+	fi
+
+	# If output was redirected to the logfile during an interactive session,
+	# repoint it to the console.
+	exec &>$(tty)
+
+	# Error trapping is turned off because we want to handle errors.
+	set +e
+	trap - EXIT
+
+	exit $1
+}
+
+# (display_usage_message_and_bail_out) - Function used to display the usage when an invalid command line option is passed to the script.
+function display_usage_message_and_bail_out ()
+{
+	if [ ! -z "${1+x}" ]; then
+		printf "%s: %s\n" "${g_PROGNAME}" "${1}" >&2
+	fi
+
+	print_usage >&2
+	cleanup_and_exit_with_code 1
+}
+
+# (error) - Function for the error catching routine, display an error cleanup and exit the script.
+function error ()
+{
+	echo
+	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
+	cleanup_and_exit_with_code 1
+}
+
+# (help) - Function used to display the scripts usage and command line options.
+function help ()
+{
+	printf "${g_PROGNAME} - ${g_PROGRAM_DESCRIPTION}\n"
+	print_usage
+}
+
+# (info) - Function for formatted informational messages.
+function info ()
+{
+	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
+}
+
+# (print_usage) - Function used to display the scripts usage and command line options.
+function print_usage ()
+{
+	clear
+	script_banner
+
+	cat << EOF
+  Usage: ${g_PROGNAME} [-l <lab number> & -e <email address>] || 
+			  [-l 2 & -e <email address> | -i] ||
+			  [-l 3 ]
+			  [-h help] [-v version]
+
+  Required Options:
+	-l <lab number>	  choose lab to check [1-3]
+	-e <email address>	test for the e-mail address
+
+  Options:
+	-h				show this help message and exit
+	-i				import key (lab two only)
+	-v				display the version number of ${g_PROGNAME} and exit
+EOF
+}
+
+# (print_version) - Function used to print the script version.
+function print_version ()
+{
+	clear
+	script_banner
+
+	printf "%s\n" "${g_VERSION}"
+}
+
+function process_command_line_options ()
+{
+	# (l_ARGS) - Local array used to hold options passed from the command line.
+	declare -a l_ARGS=( )
+
+	if [[ ! $@ =~ ^\-.+ ]]; then
+		display_usage_message_and_bail_out
+	fi
+
+	# REPLACE LONG TOKENS WITH SHORT TOKENS
+	for arg in "$@"; do
+		case "$arg" in
+			--lab)   l_ARGS+=( -l ) ;;
+			--email) l_ARGS+=( -e ) ;;
+			*)       l_ARGS+=( "$arg" ) ;;
+		esac
+	done
+
+	set -- "${l_ARGS[@]}"
+
+	# Extract the options and their arguments into variables.
+	while getopts ":l:e:hiv" OPTION; do
+		: "$OPTION" "$OPTARG"
+		case "$OPTION" in
+			l)   g_ARG_GRADE_LAB=1; g_ARG_LAB="$OPTARG"; (( g_ARG_LAB >= 1 && g_ARG_LAB <= 3 )) || error "Option '-$OPTION' requires a value between 1-3." ;;
+			e)   g_ARG_STU_EMAIL=1; g_STU_EMAIL="$OPTARG"; [[ $g_STU_EMAIL =~ ^([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6})*$ ]] || error "Option '-$OPTION' requires a properly formatted e-mail address." ;;
+			h)   display_usage_message_and_bail_out ;;
+			i)   g_ARG_RECV_KEY=1; shift ;;
+			v)   print_version >&2; cleanup_and_exit_with_code 1 ;;
+			:)   error "Option -$OPTARG requires an arguement." ;;
+			"?") error "Invalid option -$OPTARG" ;;
+		esac
+	done
+}
+
+# (script_banner) - Function used to display the program banner when it is executed interactively from the CLI.
+function script_banner ()
+{
+	printf "${g_WHITE_TEXT}${g_PROGRAM_NAME}, v${g_VERSION}${g_RESET_ATTS}\n"
+	printf "${g_CYAN_TEXT}${g_COPYRIGHT_TEXT}${g_RESET_ATTS}\n"
+	printf "${g_CYAN_TEXT}${g_AUTHOR_TEXT} <${g_AUTHOR_EMAIL}>${g_RESET_ATTS}\n"
+	printf -- "--------------------------------------------------------------------------------\n\n"
+}
+
+# (warning) - Function for formatted warning messages.
+function warning ()
+{
+	echo -e "${g_YELLOW_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}WARNING: ${1}" >&2
+}
+# ######################## end script basic functions #########################
+
+# ###################### begin script specific functions ######################
+# (get_filename) - Make students email address into a filename.
+function get_filename ()
+{
+	# (l_email) - Local string used to hold email address of the student.
+	local l_email=$1
+
+	# (l_filename) - Local string used to hold the filename returned to the calling function.
+	local l_filename=
+
+	l_filename=$(echo -e $l_email | sed -e 's/\@/\_at\_/')
+	l_filename=$(echo -e $l_filename| sed -e 's/\./\_/g')
+
+	# Return the filename.
+	echo "$l_filename"
+}
+
+# (get_name) - Extract the student's name from their public key.
+function get_name ()
+{
+	# (l_rsaid) - String used to temproarially hold the sent RSA ID of the student's public key.
+	local l_rsaid=$1
+
+	# (l_name) - String used to temproarially hold the name of the student.
+	local l_name=""
+
+	# Extract students name from public key.
+	l_name=$(gpg --list-keys $l_rsaid 2>&1 | grep -E uid)
+	l_name=$(echo -e $l_name | sed -e 's/^.*\] //')
+	l_name=$(echo -e $l_name | sed -e 's/<[^>]*>//g')
+	l_name=$(echo -e $l_name | sed -e 's/[[:space:]]*$//')
+
+	# Return student's Name.
+	echo "$l_name"
+}
+
+# (get_rsaid) - Get the RSA ID from the student's public key supplying the keyserver and the email address, and retrieve the public key from the key server.
+function get_rsaid()
+{
+	# (l_rsaid) - String used to hold then return the extracted RSA ID of the student.
+	local l_rsaid=""
+
+	# (l_stu_rsaid1) - String used to hold the extracted RSA ID of the student from keyserver one.
+	local l_stu_rsaid1=""
+
+	# (l_stu_rsaid2) - String used to hold the extracted RSA ID of the student from keyserver two.
+	local l_stu_rsaid2=""
+
+	# Test g_KEYSERVER_1 for students key, if found import into keychain and return a flag.
+	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+	if [ -n "$l_stu_rsaid1" ]; then
+		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_1."
+		gpg --keyserver $g_KEYSERVER_1 --recv-keys $l_stu_rsaid1 >> /dev/null 2>&1
+		if [[ $? -ne 0 ]]; then
+			warning "An issue occured when contacting the $g_KEYSERVER_1 keyserver."
+		fi
+		g_KEYSERVER_FLAG1=1
+		l_rsaid=$l_stu_rsaid1
+	else
+		warning "Students key was not uploaded to $g_KEYSERVER_1."
+	fi
+
+	# Test g_KEYSERVER_2 for students key, if found import into keychain and return a flag.
+	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+	if [ -n "$l_stu_rsaid2" ]; then
+		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_2."
+		gpg --keyserver $g_KEYSERVER_2 --recv-keys $l_stu_rsaid2 >> /dev/null 2>&1
+		if [[ $? -ne 0 ]]; then
+			warning "An issue occured when contacting the $g_KEYSERVER_2 keyserver."
+		fi
+		g_KEYSERVER_FLAG2=1
+		l_rsaid=$l_stu_rsaid2
+	else
+		warning "Students key was not uploaded to $g_KEYSERVER_2."
+	fi
+
+	if ((g_KEYSERVER_FLAG1==0 && g_KEYSERVER_FLAG2==0)); then
+		error "Students key was not uploaded to either keyserver correctly."
+	fi
+
+	g_STU_RSAID=$l_rsaid
+}
+
+# (lab_1) - Steps required to respond to lab 1.
+function lab_1 ()
+{
+	# (l_student_name) - String used to hold the name of the student name returned from the get_name function.
+	local l_student_name=
+
+	# (l_filename) - String used to hold the filename derived from the students email address.
+	local l_filename=
+
+	# Check keyserver for the student's public key, set flag if it exists.
+	get_rsaid
+
+	# Get the students name.
+	l_student_name=$(get_name $g_STU_RSAID)
+
+	# Create a filename from the students email address.
+	l_filename=$(get_filename $g_STU_EMAIL)
+
+	# Write response message to student.
+	printf "${l_student_name}\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+
+	printf "I received your encrypted e-mail and look forward to reading your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	if ((g_KEYSERVER_FLAG1==0)); then
+		printf "Please note that your public key was not found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+		printf "Please explain why it was not found on this keyserver in your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	fi
+
+	if ((g_KEYSERVER_FLAG2==0)); then
+		printf "Please note that your public key was not found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+		printf "Please explain why it was not found on this keyserver in your lab report.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	fi
+
+	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+
+	# Encrypt the message to the student using their public key and clean up.
+	info "Encrypting Lab: 1 message to ${l_student_name}."
+	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_filename.gpg ${g_PATHTODESKTOP}/${l_filename}.txt
+	rm ${g_PATHTODESKTOP}/${l_filename}.txt
+}
+
+# (lab_2) - Steps required to respond to lab 2.
+function lab_2 ()
+{
+	# (l_student_name) - String used to hold the name of the student name returned from the get_name function.
+	local l_student_name=
+
+	# (l_stu_filename) - String used to hold the filename derived from the students email address.
+	local l_stu_filename=
+
+	# (l_inst_filename) - String used to hold the filename derived from the instructors email address.
+	local l_inst_filename=
+
+	# (l_file) - String used to hold the name of the file during the filename normalization process.
+	local l_file=
+
+	# (l_refile) - String used to hold the renamed filename during the normalization of the imported filename.
+	local l_refile=
+
+	# (l_rreturn) - String used to temporarially hold the return value from a command or function.
+	local l_return=
+
+	# Check for the existence of the instructors encrypted and signed public on the desktop.
+	if ! (compgen -G "$g_PATHTODESKTOP/$g_INST_SHORT*" > /dev/null); then
+		error "The instructors encrypted and signed public key is missing from the desktop."
+	fi
+
+	# Check keyserver for the student's public key, set flag if it exists.
+	get_rsaid
+
+	# Get the students name.
+	l_student_name=$(get_name $g_STU_RSAID)
+
+	# Using the extracted RSA ID, pull the public key from keyserver then sign the students public key.
+	info "Signing the public key for $l_student_name using the instructors private key."
+	gpg --batch --yes --trust-model always --local-user $g_INST_RSAID --sign-key $g_STU_RSAID >/dev/null 2>&1
+
+	# Create a filename from the students email address.
+	l_stu_filename=$(get_filename $g_STU_EMAIL)
+
+	# Create a filename from the instructors email address.
+	l_inst_filename=$(get_filename $g_INST_EMAIL)
+
+	# NORMALIZE THE FILE NAME OF THE INSTRUCTOR'S SIGNED PUBLIC KEY FOR PROPER IMPORT.
+	# If there is a "." in the .edu change it to "_".
+	l_file=$(find "$(ls ${g_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.edu.*' 2>&1)
+	if [ ! -z "$l_file" ]; then
+		warning "The filename format is incorrect, attempting to fix."
+		l_refile=$(echo $l_file | sed -e 's/\.edu/_edu/g')
+		mv "$l_file" "$l_refile"
+	fi
+
+	# Change .pgp everywhere it is found to .gpg and set a flag if it was used in the file name.
+	l_file=$(find "$(ls ${g_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.pgp.*' 2>&1)
+	if [ ! -z "$l_file" ]; then
+		warning "Typographical error or suspected GUI use during the signing of the instructor's public key."
+		l_refile=$(echo $l_file | sed -e 's/\.pgp/.gpg/g')
+		mv "$l_file" "$l_refile"
+		l_gui=1
+	else
+		info "The student properly used the CLI, per the lab's instructions."
+		l_gui=0
+	fi
+
+	# Was the file double encrypted by accident, fix that.
+	l_file=$(find "$(ls ${g_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
+	if [ "$(echo $l_file | grep -o '.gpg' | wc -l)" -gt 1 ]; then
+		warning "The signed key was encrypted twice."
+		gpg --output ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg --decrypt ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg.gpg >/dev/null 2>&1
+		rm ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg.gpg
+	fi
+
+	# Ensure the filename matches the pattern expected.
+	l_file=$(find "$(ls ${g_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
+	if [ "$l_file" == "${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg" ]; then
+		info "The filename format is correct."
+	fi
+
+	# RECEIVE SIGNED PUBLIC KEY
+	# Test for and decrypt the instructors signed public key from the student.
+	if [ -e ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg ]; then
+		info "Decrypting the instructors public key."
+		gpg --output ${g_PATHTODESKTOP}/${l_inst_filename}.asc --decrypt ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg >/dev/null 2>&1
+		if [[ $? -ne 0 ]]; then
+			warning "An error occured when decrypting the instructors public key."
+		fi
+		l_encryptedpublic=1
+	else
+		warning "The instructors public key was NOT encrypted."
+		l_encryptedpublic=0
+	fi
+
+	if ((l_encryptedpublic==1)) && ! [ -e ${g_PATHTODESKTOP}/${l_inst_filename}.asc ]; then
+		warning "Corrupt or zero byte length public key."
+		l_encryptedpublic=0
+	fi
+
+	# Import the instructors public key signed by the student.
+	info "Importing public key."
+	gpg --import ${g_PATHTODESKTOP}/${l_inst_filename}.asc >/dev/null 2>&1
+
+	info "Ensuring the student signed the instructors public key."
+	l_return=$(gpg --list-sigs ${g_INST_RSAID} | grep ${g_STU_RSAID})
+	if [ -n "$l_return" ]; then
+		info "The public key was signed by the student."
+		l_signed=1
+	else
+		warning "The public key was NOT signed by the student."
+		l_signed=0
+	fi
+
+	# Upload the signed public key to the key server(s).
+	info "Sending signed key to $g_KEYSERVER_1."
+	gpg --keyserver $g_KEYSERVER_1 --send-key $g_INST_RSAID >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		warning "There was an issue sending the signed public key to $g_KEYSERVER_2."
+	fi
+
+	info "Sending signed key to $g_KEYSERVER_2."
+	gpg --keyserver $g_KEYSERVER_2 --send-key $g_INST_RSAID >/dev/null 2>&1
+	if [[ $? -ne 0 ]]; then
+		warning "There was an issue sending the signed public key to $g_KEYSERVER_2."
+	fi
+
+	# SIGN AND SEND STUDENTS PUBLIC KEY
+	# Sign the students public key with my private key.
+	info "Exporting the public key for $l_student_name."
+	gpg --armor --output ${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc --export $g_STU_RSAID >/dev/null 2>&1
+
+	# Encrypt and sign the signed students public key then cleanup.
+	gpg --armor --sign --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc.gpg  ${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc >/dev/null 2>&1
+	if [ -e ${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc ]; then
+		rm ${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc
+	fi
+
+	# Begin writing the response to the student.
+	printf "${l_student_name}\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	if ((l_encryptedpublic==1)); then
+		printf "1. INFO: You properly encrypted my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "1. ERROR: You did NOT encrypt my public key file, no public key was attached to your response, or the public key file sent was zero byte length.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
+
+	if ((l_signed==1)); then
+		printf "2. INFO: You properly signed my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "2. ERROR: You did NOT properly sign my public key.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
+
+	if ((l_gui==1)); then
+		printf "3. WARNING: The signed file came to me encrypted using the .pgp extension.  This could be a typographical error, please explain this in your findings.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
+
+	printf "\nI look forward to reading your lab report.  Remember, to receive full credit; you must upload your signed public key (attached) to both of the key servers listed in your lab.\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Encrypt the message to the student using their public key and clean up.
+	info "Encrypting the instructor's message to ${l_student_name}."
+	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_stu_filename-message.gpg ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt >/dev/null 2>&1
+	if [ -e ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt ]; then
+		info "Removing the instructor's clear-text message to the student, ${l_stu_filename}-message.txt."
+		rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
+
+	# Clean up the enviornment only if the files were generated correctly.
+	if [[ -e "${g_PATHTODESKTOP}/${l_stu_filename}-message.gpg" &&  "${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc.gpg" ]]; then
+		info "Cleaning up the enviornment."
+		if [ -e ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg ]; then
+			info "Removing the instructor's signed and encrypted public key, ${l_inst_filename}.asc.gpg."
+			rm ${g_PATHTODESKTOP}/${l_inst_filename}.asc.gpg
+		fi
+
+		if [ -e ${g_PATHTODESKTOP}/${l_inst_filename}.asc ]; then
+			info "Removing the instructor's signed public key, ${l_inst_filename}.asc."
+			rm ${g_PATHTODESKTOP}/${l_inst_filename}.asc
+		fi
+	fi
+}
+
+# (lab_3) - Steps required to validate lab 3.
+function lab_3 ()
+{
+	echo "Lab Number is: 3"
+}
+# ####################### end script specific functions #######################
+
+###############################################################################
+### MAIN SCRIPT CONTROL
+###############################################################################
+clear
+process_command_line_options "$@"
+script_banner
+
+case "${g_ARG_LAB}" in
+	1 ) lab_1 ;;
+	2 ) lab_2 ;;
+	3 ) lab_3 ;;
+esac
