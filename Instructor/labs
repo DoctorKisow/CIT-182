@@ -15,19 +15,12 @@
 
 # Scroll to the bottom of this script to follow the main script flow.
 
-## Set how the script will behave when certain conditions are encountered.
-# Enable exiting immediately if a command exits with a non-zero status.
-set -e
-
-# Enable erroring on un-bound (undefined) variables.
-#set -u
-
 # Enable filename patterns that match no files to expand to a null string, rather than themselves.
 shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.12"
+g_VERSION="0.0.14"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
