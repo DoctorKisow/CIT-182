@@ -4,24 +4,24 @@
 Version Control Document.
 
 #GRADING SCRIPT
-Version 	Description						Date                    Filename
-0.0.7		Script used to grade PKI labs				26-JUN-2023		labs.sh
+Version		Description											Date			Filename
+0.0.12		Script used to grade PKI labs						28-JUN-2023		labs
 
 
 #PKI 1 - SENDING ENCRYPTED MESSAGES
-Version 	Description						Date                    Filename
-1.0         	PKI Lab							08-MAR-2022             PKI Lab.docx
-2.0         	Sending Encrypted Messages				09-JUN-2022             Sending Encrypted Messages.docx
-3.0         	Sending Encrypted Messages - CLI Rewrite		13-NOV-2022             PKI 1 - Sending Encrypted Messages.docx
+Version 	Description											Date			Filename
+1.0			PKI Lab												08-MAR-2022		PKI Lab.docx
+2.0			Sending Encrypted Messages							09-JUN-2022		Sending Encrypted Messages.docx
+3.0			Sending Encrypted Messages - CLI Rewrite			13-NOV-2022		PKI 1 - Sending Encrypted Messages.docx
 
 
 #PKI 2 - SIGNING GPG KEYS
-Version 	Description						Date                    Filename
-1.0         	Signing GPG Keys					09-JUN-2022             Signing GPG Keys.docx
-2.0         	Signing GPG Keys					13-OCT-2022             PKI 2 - Signing GPG Keys.docx
+Version		Description											Date			Filename
+1.0			Signing GPG Keys									09-JUN-2022		Signing GPG Keys.docx
+2.0			Signing GPG Keys									13-OCT-2022		PKI 2 - Signing GPG Keys.docx
 
 
 #PKI 3 - CREATING AND VERIFYING DIGITALLY SIGNED DOCUMENTS
-Version 	Description						Date                    Filename
-1.0         	Creating and Verifying Digitally Signed Documents       03-JUN-2022             Creating and Verifying Digitally Signed Documents.docx
-2.0         	Creating and Verifying Digitally Signed Documents       13-OCT-2022             PKI 3 - Creating and Verifying Digitally Signed Documents.docx
+Version 	Description											Date			Filename
+1.0			Creating and Verifying Digitally Signed Documents	03-JUN-2022		Creating and Verifying Digitally Signed Documents.docx
+2.0			Creating and Verifying Digitally Signed Documents	13-OCT-2022		PKI 3 - Creating and Verifying Digitally Signed Documents.docx
