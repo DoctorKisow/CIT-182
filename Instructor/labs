@@ -20,7 +20,7 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.15"
+g_VERSION="0.0.16"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
