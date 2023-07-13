@@ -20,7 +20,7 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.14"
+g_VERSION="0.0.15"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
@@ -139,13 +139,13 @@ function print_usage ()
 			  [-h help] [-v version]
 
   Required Options:
-	-l <lab number>	  choose lab to check [1-3]
+	-l <lab number>		choose lab to check [1-3]
 	-e <email address>	test for the e-mail address
 
   Options:
-	-h				show this help message and exit
-	-i				import key (lab two only)
-	-v				display the version number of ${g_PROGNAME} and exit
+	-h					show this help message and exit
+	-i					import key (lab two only)
+	-v					display the version number of ${g_PROGNAME} and exit
 EOF
 }
 
@@ -258,8 +258,14 @@ function get_rsaid()
 	local l_stu_rsaid2=""
 
 	# Test g_KEYSERVER_1 for students key, if found import into keychain and return a flag.
-	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
-	if [ -n "$l_stu_rsaid1" ]; then
+	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
+	if (( $l_stu_rsaid1 > 0 ));
+		if (( $l_stu_rsaid1 > 1 )); then
+			error "There are multiple public keys associated with this students e-mail address."
+		else
+			l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+		fi
+
 		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_1."
 		gpg --keyserver $g_KEYSERVER_1 --recv-keys $l_stu_rsaid1 >> /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
@@ -272,8 +278,14 @@ function get_rsaid()
 	fi
 
 	# Test g_KEYSERVER_2 for students key, if found import into keychain and return a flag.
-	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
-	if [ -n "$l_stu_rsaid2" ]; then
+	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
+	if (( $l_stu_rsaid2 > 0 ));
+		if (( $l_stu_rsaid2 > 1 )); then
+			error "There are multiple public keys associated with this students e-mail address."
+		else
+			l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+		fi
+
 		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_2."
 		gpg --keyserver $g_KEYSERVER_2 --recv-keys $l_stu_rsaid2 >> /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
