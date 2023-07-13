@@ -259,11 +259,11 @@ function get_rsaid()
 
 	# Test g_KEYSERVER_1 for students key, if found import into keychain and return a flag.
 	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
-	if (( $l_stu_rsaid1 > 0 ));
+	if (( $l_stu_rsaid1 > 0 )); then
 		if (( $l_stu_rsaid1 > 1 )); then
-			error "There are multiple public keys associated with this students e-mail address."
+			error "The keyserver $g_KEYSERVER_1 has multiple public keys associated with this students e-mail address."
 		else
-			l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+			l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
 		fi
 
 		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_1."
@@ -279,9 +279,9 @@ function get_rsaid()
 
 	# Test g_KEYSERVER_2 for students key, if found import into keychain and return a flag.
 	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
-	if (( $l_stu_rsaid2 > 0 ));
+	if (( $l_stu_rsaid2 > 0 )); then
 		if (( $l_stu_rsaid2 > 1 )); then
-			error "There are multiple public keys associated with this students e-mail address."
+			error "The keyserver $g_KEYSERVER_2 has multiple public keys associated with this students e-mail address."
 		else
 			l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
 		fi
@@ -312,6 +312,8 @@ function lab_1 ()
 
 	# (l_filename) - String used to hold the filename derived from the students email address.
 	local l_filename=
+
+	info "Validating PKI Lab 1, please be patient..."
 
 	# Check keyserver for the student's public key, set flag if it exists.
 	get_rsaid
@@ -364,6 +366,8 @@ function lab_2 ()
 
 	# (l_rreturn) - String used to temporarially hold the return value from a command or function.
 	local l_return=
+
+	info "Validating PKI Lab 2, please be patient..."
 
 	# Check for the existence of the instructors encrypted and signed public on the desktop.
 	if ! (compgen -G "$g_PATHTODESKTOP/$g_INST_SHORT*" > /dev/null); then
