@@ -20,7 +20,7 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.16"
+g_VERSION="0.0.17"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
@@ -109,7 +109,7 @@ function display_usage_message_and_bail_out ()
 function error ()
 {
 	echo
-	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}ERROR: ${1} - exiting" >&2
+	echo -e "${g_RED_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}  ERROR: ${1} - exiting" >&2
 	cleanup_and_exit_with_code 1
 }
 
@@ -123,7 +123,7 @@ function help ()
 # (info) - Function for formatted informational messages.
 function info ()
 {
-	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}INFO: ${1}" >&2
+	echo -e "${g_CYAN_TEXT}${g_PREFIXSTRING}${g_RESET_ATTS}   INFO: ${1}" >&2
 }
 
 # (print_usage) - Function used to display the scripts usage and command line options.
@@ -257,36 +257,35 @@ function get_rsaid()
 	# (l_stu_rsaid2) - String used to hold the extracted RSA ID of the student from keyserver two.
 	local l_stu_rsaid2=""
 
+	info "Retreiving the students public key."
+
 	# Test g_KEYSERVER_1 for students key, if found import into keychain and return a flag.
-	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
-	if (( $l_stu_rsaid1 > 0 )); then
-		if (( $l_stu_rsaid1 > 1 )); then
+	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+	echo $l_stu_rsaid1
+	if [ -n "$l_stu_rsaid1" ]; then
+		if (( ${#l_stu_rsaid1} > 16 )); then
 			error "The keyserver $g_KEYSERVER_1 has multiple public keys associated with this students e-mail address."
-		else
-			l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
 		fi
 
-		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_1."
+		info "  Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_1."
 		gpg --keyserver $g_KEYSERVER_1 --recv-keys $l_stu_rsaid1 >> /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
-			warning "An issue occured when contacting the $g_KEYSERVER_1 keyserver."
+			warning "  An issue occured when contacting the $g_KEYSERVER_1 keyserver."
 		fi
 		g_KEYSERVER_FLAG1=1
 		l_rsaid=$l_stu_rsaid1
 	else
-		warning "Students key was not uploaded to $g_KEYSERVER_1."
+		warning "  Students key was not uploaded to $g_KEYSERVER_1."
 	fi
 
 	# Test g_KEYSERVER_2 for students key, if found import into keychain and return a flag.
-	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g' | wc -l)
-	if (( $l_stu_rsaid2 > 0 )); then
-		if (( $l_stu_rsaid2 > 1 )); then
+	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
+	if [ -n "$l_stu_rsaid2" ]; then
+		if (( ${#l_stu_rsaid2} > 16 )); then
 			error "The keyserver $g_KEYSERVER_2 has multiple public keys associated with this students e-mail address."
-		else
-			l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
 		fi
 
-		info "Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_2."
+		info "  Retrieving the public key for $g_STU_EMAIL from $g_KEYSERVER_2."
 		gpg --keyserver $g_KEYSERVER_2 --recv-keys $l_stu_rsaid2 >> /dev/null 2>&1
 		if [[ $? -ne 0 ]]; then
 			warning "An issue occured when contacting the $g_KEYSERVER_2 keyserver."
@@ -294,7 +293,7 @@ function get_rsaid()
 		g_KEYSERVER_FLAG2=1
 		l_rsaid=$l_stu_rsaid2
 	else
-		warning "Students key was not uploaded to $g_KEYSERVER_2."
+		warning "  Students key was not uploaded to $g_KEYSERVER_2."
 	fi
 
 	if ((g_KEYSERVER_FLAG1==0 && g_KEYSERVER_FLAG2==0)); then
@@ -313,7 +312,7 @@ function lab_1 ()
 	# (l_filename) - String used to hold the filename derived from the students email address.
 	local l_filename=
 
-	info "Validating PKI Lab 1, please be patient..."
+	info "Validating PKI Lab 1..."
 
 	# Check keyserver for the student's public key, set flag if it exists.
 	get_rsaid
@@ -367,7 +366,7 @@ function lab_2 ()
 	# (l_rreturn) - String used to temporarially hold the return value from a command or function.
 	local l_return=
 
-	info "Validating PKI Lab 2, please be patient..."
+	info "Validating PKI Lab 2..."
 
 	# Check for the existence of the instructors encrypted and signed public on the desktop.
 	if ! (compgen -G "$g_PATHTODESKTOP/$g_INST_SHORT*" > /dev/null); then
