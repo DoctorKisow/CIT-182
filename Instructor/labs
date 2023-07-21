@@ -15,6 +15,8 @@
 
 # Scroll to the bottom of this script to follow the main script flow.
 
+# TODO: -i, When set ONLY search local cache for RSA ID key.
+
 # Enable filename patterns that match no files to expand to a null string, rather than themselves.
 shopt -s nullglob
 
@@ -68,7 +70,7 @@ declare -i g_KEYSERVER_FLAG2=0
 
 # (g_ARG_<variable>) - Boolean values used to indicate which command line options are set during execution; the default for all values is 0.
 # WARNING: DO NOT MODIFY THESE VALUE(S)!
-declare -i g_ARG_RECV_KEY=0
+declare -i g_ARG_CACHE_KEY=0
 declare -i g_ARG_LAB=0
 declare -i g_ARG_GRADE_LAB=0
 declare -i g_ARG_STU_EMAIL=0
@@ -134,7 +136,7 @@ function print_usage ()
 
 	cat << EOF
   Usage: ${g_PROGNAME} [-l <lab number> & -e <email address>] || 
-			  [-l 2 & -e <email address> | -i] ||
+			  [-l 2 & -e <email address> | -c] ||
 			  [-l 3 ]
 			  [-h help] [-v version]
 
@@ -144,7 +146,7 @@ function print_usage ()
 
   Options:
 	-h					show this help message and exit
-	-i					import key (lab two only)
+	-c					use cached key from previous import (lab two only)
 	-v					display the version number of ${g_PROGNAME} and exit
 EOF
 }
@@ -179,13 +181,13 @@ function process_command_line_options ()
 	set -- "${l_ARGS[@]}"
 
 	# Extract the options and their arguments into variables.
-	while getopts ":l:e:hiv" OPTION; do
+	while getopts ":l:e:hcv" OPTION; do
 		: "$OPTION" "$OPTARG"
 		case "$OPTION" in
 			l)   g_ARG_GRADE_LAB=1; g_ARG_LAB="$OPTARG"; (( g_ARG_LAB >= 1 && g_ARG_LAB <= 3 )) || error "Option '-$OPTION' requires a value between 1-3." ;;
 			e)   g_ARG_STU_EMAIL=1; g_STU_EMAIL="$OPTARG"; [[ $g_STU_EMAIL =~ ^([a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6})*$ ]] || error "Option '-$OPTION' requires a properly formatted e-mail address." ;;
 			h)   display_usage_message_and_bail_out ;;
-			i)   g_ARG_RECV_KEY=1; shift ;;
+			c)   g_ARG_CACHE_KEY=1; shift ;;
 			v)   print_version >&2; cleanup_and_exit_with_code 1 ;;
 			:)   error "Option -$OPTARG requires an arguement." ;;
 			"?") error "Invalid option -$OPTARG" ;;
@@ -261,7 +263,7 @@ function get_rsaid()
 
 	# Test g_KEYSERVER_1 for students key, if found import into keychain and return a flag.
 	l_stu_rsaid1=$(gpg --batch --keyserver $g_KEYSERVER_1 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
-	echo $l_stu_rsaid1
+
 	if [ -n "$l_stu_rsaid1" ]; then
 		if (( ${#l_stu_rsaid1} > 16 )); then
 			error "The keyserver $g_KEYSERVER_1 has multiple public keys associated with this students e-mail address."
