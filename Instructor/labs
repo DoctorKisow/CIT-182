@@ -533,6 +533,12 @@ function lab_3 ()
 {
 	echo "Lab Number is: 3"
 }
+
+# (set_email) - Will create an email in Microsoft Outlook ready to send.
+function set_email ()
+{
+
+}
 # ####################### end script specific functions #######################
 
 ###############################################################################
