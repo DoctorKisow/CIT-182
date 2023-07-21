@@ -15,6 +15,11 @@
 
 # Scroll to the bottom of this script to follow the main script flow.
 
+# This script is written in POSIX compliant Bash for macOS and uses
+# AppleScript and Microsoft Outlook to send responses. The 'set_email'
+# function can becommented out in the lab functions and responses can
+# be sent manually.
+
 # TODO: -i, When set ONLY search local cache for RSA ID key.
 
 # Enable filename patterns that match no files to expand to a null string, rather than themselves.
@@ -22,7 +27,7 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.17"
+g_VERSION="0.0.18"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
@@ -228,7 +233,7 @@ function get_filename ()
 	echo "$l_filename"
 }
 
-# (get_name) - Extract the student's name from their public key.
+# (get_name) - Extract the student's full name from their public key.
 function get_name ()
 {
 	# (l_rsaid) - String used to temproarially hold the sent RSA ID of the student's public key.
@@ -241,9 +246,10 @@ function get_name ()
 	l_name=$(gpg --list-keys $l_rsaid 2>&1 | grep -E uid)
 	l_name=$(echo -e $l_name | sed -e 's/^.*\] //')
 	l_name=$(echo -e $l_name | sed -e 's/<[^>]*>//g')
+	l_name=$(echo -e $l_name | cut -d' ' -f1 -f2)
 	l_name=$(echo -e $l_name | sed -e 's/[[:space:]]*$//')
 
-	# Return student's Name.
+	# Return student's full name.
 	echo "$l_name"
 }
 
@@ -266,6 +272,7 @@ function get_rsaid()
 
 	if [ -n "$l_stu_rsaid1" ]; then
 		if (( ${#l_stu_rsaid1} > 16 )); then
+			set_email "$l_student_first_name" "$g_STU_EMAIL" "PKI Lab - Multiple Public Keys" "<p>The keyserver $g_KEYSERVER_1 has multiple public keys associated with your e-mail address. Please address these issues and resubmit your lab.</p>"
 			error "The keyserver $g_KEYSERVER_1 has multiple public keys associated with this students e-mail address."
 		fi
 
@@ -284,6 +291,7 @@ function get_rsaid()
 	l_stu_rsaid2=$(gpg --batch --keyserver $g_KEYSERVER_2 --search-keys $g_STU_EMAIL 2>&1 | grep -E '\d+\s*bit\s*\S+\s*key\s*[^,]+' | sed -e 's/^[ \t]*//' | cut -d' ' -f 7 | sed 's/,*$//g')
 	if [ -n "$l_stu_rsaid2" ]; then
 		if (( ${#l_stu_rsaid2} > 16 )); then
+			set_email "$l_student_first_name" "$g_STU_EMAIL" "PKI Lab - Multiple Public Keys" "<p>The keyserver $g_KEYSERVER_2 has multiple public keys associated with your e-mail address. Please address these issues and resubmit your lab.</p>"
 			error "The keyserver $g_KEYSERVER_2 has multiple public keys associated with this students e-mail address."
 		fi
 
@@ -299,6 +307,7 @@ function get_rsaid()
 	fi
 
 	if ((g_KEYSERVER_FLAG1==0 && g_KEYSERVER_FLAG2==0)); then
+		set_email "$l_student_first_name" "$g_STU_EMAIL" "PKI Lab - Public Key Server Issue" "<p>Neither of the labs public key servers have your public key uploaded to them properly. Please address this issue and resubmit your lab.</p>"
 		error "Students key was not uploaded to either keyserver correctly."
 	fi
 
@@ -311,8 +320,11 @@ function lab_1 ()
 	# (l_student_name) - String used to hold the name of the student name returned from the get_name function.
 	local l_student_name=
 
-	# (l_filename) - String used to hold the filename derived from the students email address.
-	local l_filename=
+	# (l_student_first_name) - String used to hold the first name of the student parsed from the l_student_name.
+	local l_student_first_name=
+
+	# (l_stu_filename) - String used to hold the filename derived from the students email address.
+	local l_stu_filename=
 
 	info "Validating PKI Lab 1..."
 
@@ -321,30 +333,44 @@ function lab_1 ()
 
 	# Get the students name.
 	l_student_name=$(get_name $g_STU_RSAID)
+	l_student_first_name=$(echo -e $l_student_name | cut -d' ' -f1)
 
 	# Create a filename from the students email address.
-	l_filename=$(get_filename $g_STU_EMAIL)
+	l_stu_filename=$(get_filename $g_STU_EMAIL)
 
 	# Write response message to student.
-	printf "${l_student_name}\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
-	printf "I received your encrypted e-mail and look forward to reading your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
-	if ((g_KEYSERVER_FLAG1==0)); then
-		printf "Please note that your public key was not found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
-		printf "Please explain why it was not found on this keyserver in your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	if ((g_KEYSERVER_FLAG1==1)); then
+		printf "1.  INFO: Your public key was found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "1. ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "          Please explain why it was not found on this keyserver in your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
-	if ((g_KEYSERVER_FLAG2==0)); then
-		printf "Please note that your public key was not found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
-		printf "Please explain why it was not found on this keyserver in your lab report.\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	if ((g_KEYSERVER_FLAG2==1)); then
+		printf "2.  INFO: Your public key was found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "2. ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "          Please explain why it was not found on this keyserver in your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
-	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_filename}.txt
+	if ((g_KEYSERVER_FLAG1==1 && g_KEYSERVER_FLAG2==1)); then
+		printf "Great job! I look forward to reading  syour lab report!\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
 
-	# Encrypt the message to the student using their public key and clean up.
+	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Encrypt the message to the student using their public key.
 	info "Encrypting Lab: 1 message to ${l_student_name}."
-	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_filename.gpg ${g_PATHTODESKTOP}/${l_filename}.txt
-	rm ${g_PATHTODESKTOP}/${l_filename}.txt
+	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_stu_filename-message.gpg ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Clean up
+	rm  ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Create the response to the student.
+	set_email "$l_student_name" "$g_STU_EMAIL" "PKI Lab 1 - Response" "" "${g_PATHTODESKTOP}/$l_stu_filename-message.gpg"
 }
 
 # (lab_2) - Steps required to respond to lab 2.
@@ -352,6 +378,9 @@ function lab_2 ()
 {
 	# (l_student_name) - String used to hold the name of the student name returned from the get_name function.
 	local l_student_name=
+
+	# (l_student_first_name) - String used to hold the first name of the student parsed from the l_student_name.
+	local l_student_first_name=
 
 	# (l_stu_filename) - String used to hold the filename derived from the students email address.
 	local l_stu_filename=
@@ -380,6 +409,7 @@ function lab_2 ()
 
 	# Get the students name.
 	l_student_name=$(get_name $g_STU_RSAID)
+	l_student_first_name=$(echo -e $l_student_name | cut -d' ' -f1)
 
 	# Using the extracted RSA ID, pull the public key from keyserver then sign the students public key.
 	info "Signing the public key for $l_student_name using the instructors private key."
@@ -484,19 +514,19 @@ function lab_2 ()
 	fi
 
 	# Begin writing the response to the student.
-	printf "${l_student_name}\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
 	if ((l_encryptedpublic==1)); then
-		printf "1. INFO: You properly encrypted my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "1.    INFO: You properly encrypted my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
-		printf "1. ERROR: You did NOT encrypt my public key file, no public key was attached to your response, or the public key file sent was zero byte length.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "1.   ERROR: You did NOT encrypt my public key file, no public key was attached to your response, or the public key file sent was zero byte length.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	if ((l_signed==1)); then
-		printf "2. INFO: You properly signed my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "2.    INFO: You properly signed my public key file.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
-		printf "2. ERROR: You did NOT properly sign my public key.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "2.   ERROR: You did NOT properly sign my public key.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	if ((l_gui==1)); then
@@ -504,6 +534,7 @@ function lab_2 ()
 	fi
 
 	printf "\nI look forward to reading your lab report.  Remember, to receive full credit; you must upload your signed public key (attached) to both of the key servers listed in your lab.\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
 	# Encrypt the message to the student using their public key and clean up.
 	info "Encrypting the instructor's message to ${l_student_name}."
@@ -526,6 +557,9 @@ function lab_2 ()
 			rm ${g_PATHTODESKTOP}/${l_inst_filename}.asc
 		fi
 	fi
+
+	# Create the response to the student.
+	set_email "$l_student_name" "$g_STU_EMAIL" "PKI Lab 2 - Response and Signed Key" "" "${g_PATHTODESKTOP}/${l_stu_filename}-message.gpg" "${g_PATHTODESKTOP}/${l_stu_filename}-signed-key.asc.gpg"
 }
 
 # (lab_3) - Steps required to validate lab 3.
@@ -537,7 +571,66 @@ function lab_3 ()
 # (set_email) - Will create an email in Microsoft Outlook ready to send.
 function set_email ()
 {
+	# (l_student_name) - Name of the student for the email correspondence.
+	local l_student_name="$1"
 
+	# (l_student_first_name) - String used to hold the first name of the student parsed from the l_student_name.
+	local l_student_first_name=$(echo -e $l_student_name | cut -d' ' -f1)
+
+	# (l_student_email) - e-Mail address of the student for the correspondence.
+	local l_student_email="$2"
+
+	# (l_subject) - Subject line of the email.
+	local l_subject="$3"
+
+	# (l_body) - Body of the email is static unless non-null argument is passed in fourth position.
+	local l_body="$4"
+
+	# Default e-Mail static body.
+ 	if [ -z $l_body ]; then
+		l_body="<p>${l_student_first_name}:<br /><br />Please include the attached response in your lab report.<br />If the attached response asked you to explain any issues with your submission, please ensure that you address those issues in your lab report.</p>\n"
+	fi
+
+	# (l_attachment1) - Attachment file one, required.
+	local l_attachment1="$5"
+
+	# (l_attachment2) - Attachment file two, optional.
+	local l_attachment2="$6"
+
+	# Create AppleScript to create email and attach the files.
+	printf "set theSubject to \"${l_subject}\"\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "set theContent to \"${l_body}\"\n" >> ${g_PATHTODESKTOP}/mail.scpt
+
+	if [ -n "$l_attachment1" ]; then
+		printf "set theAttachment1 to \"${l_attachment1}\" as POSIX file\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	fi
+
+	if [ -n "$l_attachment2" ]; then
+		printf "set theAttachment2 to \"${l_attachment2}\" as POSIX file\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	fi
+	printf "\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "tell application \"Microsoft Outlook\"\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "     set newMessage to make new outgoing message with properties {subject:theSubject, content:theContent}\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "     tell newMessage --tell newMessage (not theContent) to add the attachment\n" >> ${g_PATHTODESKTOP}/mail.scpt
+
+	if [ -n "$l_attachment1" ]; then
+		printf "          make new attachment with properties {file:theAttachment1}\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	fi
+
+	if [ -n "$l_attachment2" ]; then
+		printf "          make new attachment with properties {file:theAttachment2}\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	fi
+
+	printf "     end tell\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "make new recipient at newMessage with properties {email address:{name:\"${l_student_name}\", address:\"${l_student_email}\"}}\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "open newMessage\n" >> ${g_PATHTODESKTOP}/mail.scpt
+	printf "end tell\n" >> ${g_PATHTODESKTOP}/mail.scpt
+
+	# Run AppleScript
+	osascript ${g_PATHTODESKTOP}/mail.scpt
+
+	# Clean up AppleScript
+	rm ${g_PATHTODESKTOP}/mail.scpt
 }
 # ####################### end script specific functions #######################
 
