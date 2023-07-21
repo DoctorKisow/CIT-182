@@ -587,7 +587,7 @@ function set_email ()
 	local l_body="$4"
 
 	# Default e-Mail static body.
- 	if [ -z $l_body ]; then
+	if [ -z $l_body ]; then
 		l_body="<p>${l_student_first_name}:<br /><br />Please include the attached response in your lab report.<br />If the attached response asked you to explain any issues with your submission, please ensure that you address those issues in your lab report.</p>\n"
 	fi
 
