@@ -20,14 +20,14 @@
 # function can becommented out in the lab functions and responses can
 # be sent manually.
 
-# TODO: -i, When set ONLY search local cache for RSA ID key.
+# TODO: -c, When set ONLY search local cache for RSA ID key.
 
 # Enable filename patterns that match no files to expand to a null string, rather than themselves.
 shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.18"
+g_VERSION="0.0.19"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
@@ -394,7 +394,7 @@ function lab_2 ()
 	# (l_refile) - String used to hold the renamed filename during the normalization of the imported filename.
 	local l_refile=
 
-	# (l_rreturn) - String used to temporarially hold the return value from a command or function.
+	# (l_return) - String used to temporarially hold the return value from a command or function.
 	local l_return=
 
 	info "Validating PKI Lab 2..."
@@ -565,7 +565,65 @@ function lab_2 ()
 # (lab_3) - Steps required to validate lab 3.
 function lab_3 ()
 {
-	echo "Lab Number is: 3"
+	# (l_student_name) - String used to hold the name of the student name returned from the get_name function.
+	local l_student_name=
+
+	# (l_student_first_name) - String used to hold the first name of the student parsed from the l_student_name.
+	local l_student_first_name=
+
+	# (l_stu_filename) - String used to hold the filename derived from the students email address.
+	local l_stu_filename=
+
+	# (l_read_file) - String used to hold the contents of the students message file.
+	local l_read_file=
+
+	info "Validating PKI Lab 3..."
+
+	# Check keyserver for the student's public key, set flag if it exists.
+	get_rsaid
+
+	# Get the students name.
+	l_student_name=$(get_name $g_STU_RSAID)
+	l_student_first_name=$(echo -e $l_student_name | cut -d' ' -f1)
+
+	# Create a filename from the students email address.
+	l_stu_filename=$(get_filename $g_STU_EMAIL)
+
+	# Validating students signed file.
+	gpg --verify ${g_PATHTODESKTOP}/${l_stu_filename}-message.sig ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt >/dev/null 2>&1
+
+	if [ $? -ne 0 ]; then
+		set_email "$l_student_first_name" "$g_STU_EMAIL" "PKI Lab - Bad Signature" "<p>The signature for the file you sent was bad. This could be due to corruption during preperation or transport. Please address these issues and resubmit your lab.</p>"
+		error "Bad signature for received files."
+	fi
+
+	# Read file for response.
+	l_read_file=$(< ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt)
+
+	# Clean up received files!
+	rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.sig
+
+	# Write response message to student.
+	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	printf "Your file was received and had a valid signature.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	printf "$l_read_file\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	printf "Great job! Nice quote! I look forward to reading your lab report!\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Encrypt the message to the student using their public key.
+	info "Encrypting Lab: 3 message to ${l_student_name}."
+	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_stu_filename-message.gpg ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Clean up
+	rm  ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+	# Create the response to the student.
+	set_email "$l_student_name" "$g_STU_EMAIL" "PKI Lab 3 - Response" "" "${g_PATHTODESKTOP}/$l_stu_filename-message.gpg"
 }
 
 # (set_email) - Will create an email in Microsoft Outlook ready to send.
