@@ -27,7 +27,7 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.19"
+g_VERSION="0.0.20"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
@@ -362,12 +362,13 @@ function lab_1 ()
 
 	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
-	# Encrypt the message to the student using their public key.
+	# Encrypt the message to the student using their public key and clean up.
 	info "Encrypting Lab: 1 message to ${l_student_name}."
 	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_stu_filename-message.gpg ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
-
-	# Clean up
-	rm  ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	if [ -e ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt ]; then
+		info "Removing the instructor's clear-text message to the student, ${l_stu_filename}-message.txt."
+		rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
 
 	# Create the response to the student.
 	set_email "$l_student_name" "$g_STU_EMAIL" "PKI Lab 1 - Response" "" "${g_PATHTODESKTOP}/$l_stu_filename-message.gpg"
@@ -396,6 +397,15 @@ function lab_2 ()
 
 	# (l_return) - String used to temporarially hold the return value from a command or function.
 	local l_return=
+
+	# (l_gui) - Boolean used to test if a suspected GUI was used in the creation of the file.
+	declare -i l_gui=0
+
+	# (l_encryptedpublic) - Boolean used to test if the instructors public key was sent encrypted.
+	declare -i l_encryptedpublic=0
+
+	# (l_signed) - Boolean used to test if the instructors public key was signed by the student,
+	declare -i l_signed=0
 
 	info "Validating PKI Lab 2..."
 
@@ -577,6 +587,9 @@ function lab_3 ()
 	# (l_read_file) - String used to hold the contents of the students message file.
 	local l_read_file=
 
+	# (l_bad_sig) - Boolean used to test if the message file has been tampered with or corrupted in transport.
+	declare -i l_bad_sig=0
+ 
 	info "Validating PKI Lab 3..."
 
 	# Check keyserver for the student's public key, set flag if it exists.
@@ -589,16 +602,25 @@ function lab_3 ()
 	# Create a filename from the students email address.
 	l_stu_filename=$(get_filename $g_STU_EMAIL)
 
+	# Check for the existence of the message and/or signature file(s) on the desktop.
+	if ! (compgen -G "${g_PATHTODESKTOP}/${l_stu_filename}-message.*" > /dev/null); then
+		error "The students message and/or signature file(s) are missing from the desktop."
+	fi
+
 	# Validating students signed file.
 	gpg --verify ${g_PATHTODESKTOP}/${l_stu_filename}-message.sig ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt >/dev/null 2>&1
 
 	if [ $? -ne 0 ]; then
-		set_email "$l_student_first_name" "$g_STU_EMAIL" "PKI Lab - Bad Signature" "<p>The signature for the file you sent was bad. This could be due to corruption during preperation or transport. Please address these issues and resubmit your lab.</p>"
-		error "Bad signature for received files."
+		warning "  The received message file has an invalid signature."
+		l_bad_sig=1
+	else
+		info "  The received message file has a valid signature."
+		l_bad_sig=0
 	fi
 
-	# Read file for response.
+	# Read file for response, format by indenting.
 	l_read_file=$(< ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt)
+	l_read_file=$(sed -e 's/^/     /' <<< "$l_read_file")
 
 	# Clean up received files!
 	rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
@@ -608,19 +630,32 @@ function lab_3 ()
 	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
-	printf "Your file was received and had a valid signature.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
-	printf "$l_read_file\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	if ((l_bad_sig==1)); then
+		printf "1.   ERROR: The signature for the file you sent was invalid. This could be due to corruption during preperation or transport. Please explain this in the findings of your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+ 		printf "1.    INFO: The signature for the file you sent was valid. Great work on this lab!\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
 
-	printf "Great job! Nice quote! I look forward to reading your lab report!\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	if [ -n "$l_read_file" ]; then
+		printf "2.    INFO: Your received message contained the following:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "$l_read_file\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+		printf "Nice quote! I look forward to reading your lab report!\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "2.    ERROR: Your received message had no contents... Please explain this in the findings of your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+
+		printf "I look forward to reading your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
 
 	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
-	# Encrypt the message to the student using their public key.
+	# Encrypt the message to the student using their public key and clean up.
 	info "Encrypting Lab: 3 message to ${l_student_name}."
 	gpg --armor --encrypt --trust-model always --local-user $g_INST_RSAID --recipient $g_STU_EMAIL --output ${g_PATHTODESKTOP}/$l_stu_filename-message.gpg ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
-
-	# Clean up
-	rm  ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	if [ -e ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt ]; then
+		info "Removing the instructor's clear-text message to the student, ${l_stu_filename}-message.txt."
+		rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	fi
 
 	# Create the response to the student.
 	set_email "$l_student_name" "$g_STU_EMAIL" "PKI Lab 3 - Response" "" "${g_PATHTODESKTOP}/$l_stu_filename-message.gpg"
