@@ -338,26 +338,28 @@ function lab_1 ()
 	# Create a filename from the students email address.
 	l_stu_filename=$(get_filename $g_STU_EMAIL)
 
-	# Write response message to student.
+	# Begin writing the response to the student.
 	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
 	if ((g_KEYSERVER_FLAG1==1)); then
-		printf "1.  INFO: Your public key was found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "1.    INFO: Your public key was found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
-		printf "1. ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
-		printf "          Please explain why it was not found on this keyserver in your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "1.   ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_1.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "            Please explain why it was not found on this keyserver in your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	if ((g_KEYSERVER_FLAG2==1)); then
-		printf "2.  INFO: Your public key was found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "2.    INFO: Your public key was found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
-		printf "2. ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
-		printf "          Please explain why it was not found on this keyserver in your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "2.   ERROR: Your public key was not found on the public keyserver: $g_KEYSERVER_2.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "            Please explain why it was not found on this keyserver in your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	if ((g_KEYSERVER_FLAG1==1 && g_KEYSERVER_FLAG2==1)); then
-		printf "Great job! I look forward to reading  syour lab report!\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "Great job! I look forward to reading your lab report.\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+	else
+		printf "I look forward to reading your lab report.\n"  >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	printf "\nCordially,\n${g_INST_SALUATION}\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
@@ -626,23 +628,23 @@ function lab_3 ()
 	rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	rm ${g_PATHTODESKTOP}/${l_stu_filename}-message.sig
 
-	# Write response message to student.
+	# Begin writing the response to the student.
 	printf "${l_student_first_name}:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	printf "These are some of the findings you should note in your lab report:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
 	if ((l_bad_sig==1)); then
 		printf "1.   ERROR: The signature for the file you sent was invalid. This could be due to corruption during preperation or transport. Please explain this in the findings of your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
- 		printf "1.    INFO: The signature for the file you sent was valid. Great work on this lab!\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+ 		printf "1.    INFO: The signature for the file you sent was valid. Great work on this lab!\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
 
 	if [ -n "$l_read_file" ]; then
 		printf "2.    INFO: Your received message contained the following:\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 		printf "$l_read_file\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
-		printf "Nice quote! I look forward to reading your lab report!\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "Nice Quote! I look forward to reading your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	else
-		printf "2.    ERROR: Your received message had no contents... Please explain this in the findings of your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
+		printf "2.    ERROR: Your received message had no contents... Please explain this in the findings of your lab report.\n\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 
 		printf "I look forward to reading your lab report.\n" >> ${g_PATHTODESKTOP}/${l_stu_filename}-message.txt
 	fi
