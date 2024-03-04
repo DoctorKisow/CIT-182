@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # labs - A script used to grade the gpg labs for my CIT-182 Principals of Cybersecurity class.
-# Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved.
+# Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved.
 # Dr. Matthew Kisow <mkisow@ccac.edu>
 #
 
@@ -27,10 +27,10 @@ shopt -s nullglob
 
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
-g_VERSION="0.0.21"
+g_VERSION="0.0.22"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
-g_COPYRIGHT_TEXT="Copyright (c) 2022-2023 Dr. Matthew Kisow. All rights reserved."
+g_COPYRIGHT_TEXT="Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved."
 g_AUTHOR_TEXT="Dr. Matthew Kisow"
 g_AUTHOR_EMAIL="mkisow@ccac.edu"
 
@@ -627,7 +627,20 @@ function lab_3 ()
   info "Validating PKI Lab 3..."
 
   # Check keyserver for the student's public key, set flag if it exists.
-  get_rsaid
+  if ((g_ARG_CACHE_KEY==1)); then
+    info "Cached Key Option Activated"
+    info "  Checking for a cached key that matches the criteria in the local cache."
+    l_check_cache=$(gpg --list-keys | grep -C 1 -e $g_STU_EMAIL)
+    if [ -n "$l_check_cache" ]; then
+      info "  A cached key was found, extracting RSAID."
+      g_STU_RSAID=$(echo $l_check_cache | awk '{print $1}')
+    else
+      warning "  A cached key that matches the criteria was not found in the local cache."
+      error "  Run this script again without the '-c' option enabled."
+    fi
+  else
+    get_rsaid
+  fi
 
   # Get the students name.
   l_student_name=$(get_name $g_STU_RSAID)
