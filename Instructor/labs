@@ -32,7 +32,7 @@ shopt -s nullglob
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
 g_CONFFILE="${g_PROGNAME}.conf"
-g_VERSION="0.0.25"
+g_VERSION="0.0.27"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved."
@@ -452,7 +452,7 @@ function lab_2 ()
   info "Validating PKI Lab 2..."
 
   # Check for the existence of the instructors encrypted and signed public on the desktop.
-  if ! (compgen -G "$v_PATHTODESKTOP/$v_INST_SHORT*" > /dev/null); then
+  if ! (compgen -G "$v_PATHTODESKTOP/$g_INST_SHORT*" > /dev/null); then
     error "The instructors encrypted and signed public key is missing from the desktop."
   fi
 
@@ -463,7 +463,7 @@ function lab_2 ()
     l_check_cache=$(gpg --list-keys | grep -C 1 -e $g_STU_EMAIL)
     if [ -n "$l_check_cache" ]; then
       info "  A cached key was found, extracting RSAID."
-      g_STU_RSAID=$(echo $l_check_cache | awk '{print $1}')
+      g_STU_RSAID=$(echo $l_check_cache | awk '{print $1}' | cut -c25-)
     else
       warning "  A cached key that matches the criteria was not found in the local cache."
       error "  Run this script again without the '-c' option enabled."
@@ -487,38 +487,44 @@ function lab_2 ()
   l_inst_filename=$(get_filename $v_INST_EMAIL)
 
   # NORMALIZE THE FILE NAME OF THE INSTRUCTOR'S SIGNED PUBLIC KEY FOR PROPER IMPORT.
+  info "Normalizing the students import file."
+
   # If there is a "." in the .edu change it to "_".
-  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${v_INST_SHORT}* 2>&1)" -name '*.edu.*' 2>&1)
+  info "  Validating the .edu extension."
+  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.edu.*' 2>&1)
   if [ ! -z "$l_file" ]; then
-    warning "The filename format is incorrect, attempting to fix."
+    warning "    The filename format is incorrect, attempting to fix."
     l_refile=$(echo $l_file | sed -e 's/\.edu/_edu/g')
     mv "$l_file" "$l_refile"
   fi
 
   # Change .pgp everywhere it is found to .gpg and set a flag if it was used in the file name.
-  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${v_INST_SHORT}* 2>&1)" -name '*.pgp.*' 2>&1)
+  info "  Verifying that the .pgp extension was NOT used."
+  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.pgp.*' 2>&1)
   if [ ! -z "$l_file" ]; then
-    warning "Typographical error or suspected GUI use during the signing of the instructor's public key."
+    warning "    Typographical error or suspected GUI use during the signing of the instructor's public key."
     l_refile=$(echo $l_file | sed -e 's/\.pgp/.gpg/g')
     mv "$l_file" "$l_refile"
     l_gui=1
   else
-    info "The student properly used the CLI, per the lab's instructions."
+    info "    The student properly used the CLI, per the lab's instructions."
     l_gui=0
   fi
 
   # Was the file double encrypted by accident, fix that.
-  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${v_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
+  info "  Checking for double encryption."
+  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
   if [ "$(echo $l_file | grep -o '.gpg' | wc -l)" -gt 1 ]; then
-    warning "The signed key was encrypted twice."
+    warning "    The signed key was encrypted twice."
     gpg --output ${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg --decrypt ${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg.gpg >/dev/null 2>&1
     rm ${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg.gpg
   fi
 
   # Ensure the filename matches the pattern expected.
-  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${v_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
+  info "  Verifying the student's import file format."
+  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*.gpg' 2>&1)
   if [ "$l_file" == "${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg" ]; then
-    info "The filename format is correct."
+    info "    The students import file was formatted correctly."
   fi
 
   # RECEIVE SIGNED PUBLIC KEY
