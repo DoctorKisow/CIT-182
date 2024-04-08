@@ -32,7 +32,7 @@ shopt -s nullglob
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
 g_CONFFILE="${g_PROGNAME}.conf"
-g_VERSION="0.0.27"
+g_VERSION="0.0.28"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved."
@@ -496,6 +496,14 @@ function lab_2 ()
     warning "    The filename format is incorrect, attempting to fix."
     l_refile=$(echo $l_file | sed -e 's/\.edu/_edu/g')
     mv "$l_file" "$l_refile"
+  fi
+
+  # If there is no "edu" attempt to fix.
+  l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)" -name '*_edu*' 2>&1)
+  if [ -z "$l_file" ]; then
+    warning "    The filename format is missing the _edu, attempting to fix."
+    l_file=$(find "$(ls ${v_PATHTODESKTOP}/${g_INST_SHORT}* 2>&1)")
+    mv "$l_file" "${v_PATHTODESKTOP}/$l_inst_filename.asc.gpg" 2>&1
   fi
 
   # Change .pgp everywhere it is found to .gpg and set a flag if it was used in the file name.
