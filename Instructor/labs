@@ -32,7 +32,7 @@ shopt -s nullglob
 # ********************** global variable definitions *********************
 g_PROGNAME="$(basename "${0}")"
 g_CONFFILE="${g_PROGNAME}.conf"
-g_VERSION="0.0.28"
+g_VERSION="0.0.29"
 g_PROGRAM_NAME="Validate gpg Labs"
 g_PROGRAM_DESCRIPTION="A script to validate the gpg labs for CIT-182."
 g_COPYRIGHT_TEXT="Copyright (c) 2022-2024 Dr. Matthew Kisow. All rights reserved."
@@ -540,8 +540,16 @@ function lab_2 ()
   if [ -e ${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg ]; then
     info "Decrypting the instructors public key."
     gpg --output ${v_PATHTODESKTOP}/${l_inst_filename}.asc --decrypt ${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg >/dev/null 2>&1
-    if [[ $? -ne 0 ]]; then
+
+    l_RET=$?
+
+    if [[ $l_RET -ne 0 ]]; then
       warning "An error occured when decrypting the instructors public key."
+
+      if [[ $l_RET -eq 2 ]]; then
+        warning "Unexpected error, attempting to fix."
+        mv "${v_PATHTODESKTOP}/${l_inst_filename}.asc.gpg" "${v_PATHTODESKTOP}/$l_inst_filename.asc" 2>&1
+      fi
     fi
     l_encryptedpublic=1
   else
